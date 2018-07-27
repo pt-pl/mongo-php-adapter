@@ -400,8 +400,20 @@ class MongoCursor extends AbstractCursor implements Iterator
      */
     public function sort(array $fields)
     {
+        $tmp = [];
+		foreach($fields as $key => $value)
+		{
+			if(is_numeric($key))
+			{
+				$key = $value;
+				$value = 1;
+			}
+
+			$tmp[$key] = $value;
+		}
+
         $this->errorIfOpened();
-        $this->sort = $fields;
+        $this->sort = $tmp;
 
         return $this;
     }
