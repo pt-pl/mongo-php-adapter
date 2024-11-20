@@ -43,6 +43,8 @@ class TypeConverter
                 return $value->toBSONType();
             case $value instanceof BSON\Type:
                 return $value;
+            case $value instanceof \DateTimeInterface:
+                return self::fromLegacy((array) $value);
             case is_array($value):
             case is_object($value):
                 $result = [];
@@ -176,7 +178,7 @@ class TypeConverter
             case $value instanceof Model\BSONDocument:
             case $value instanceof Model\BSONArray:
                 return array_map(
-                    ['self', 'toLegacy'],
+                    [self::class, 'toLegacy'],
                     $value->getArrayCopy()
                 );
             default:

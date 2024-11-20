@@ -20,6 +20,8 @@ if (class_exists('MongoCollection', false)) {
 use Alcaeus\MongoDbAdapter\Helper;
 use Alcaeus\MongoDbAdapter\TypeConverter;
 use Alcaeus\MongoDbAdapter\ExceptionConverter;
+use MongoDB\Driver\Exception\CommandException;
+use MongoDB\Model\IndexInput;
 
 /**
  * Represents a database collection.
@@ -277,7 +279,7 @@ class MongoCollection
      */
     public function insert(&$a, array $options = [])
     {
-        if (! $this->ensureDocumentHasMongoId($a)) {
+        if ($this->ensureDocumentHasMongoId($a) === null) {
             trigger_error(sprintf('%s(): expects parameter %d to be an array or object, %s given', __METHOD__, 1, gettype($a)), E_USER_WARNING);
             return;
         }
@@ -596,7 +598,7 @@ class MongoCollection
         }
 
         if (! isset($options['name'])) {
-            $options['name'] = \MongoDB\generate_index_name($keys);
+            $options['name'] = $this->generateIndexName($keys);
         }
 
         $indexes = iterator_to_array($this->collection->listIndexes());
@@ -626,7 +628,9 @@ class MongoCollection
 
             $this->collection->createIndex($keys, $options);
         } catch (\MongoDB\Driver\Exception\Exception $e) {
-            throw ExceptionConverter::toLegacy($e, 'MongoResultException');
+            if (! $e instanceof CommandException || strpos($e->getMessage(), 'with a different name') === false) {
+                throw ExceptionConverter::toLegacy($e, 'MongoResultException');
+            }
         }
 
         $result = [
@@ -674,7 +678,7 @@ class MongoCollection
                 $indexName .= '_1';
             }
         } elseif (is_array($keys)) {
-            $indexName = \MongoDB\generate_index_name($keys);
+            $indexName = $this->generateIndexName($keys);
         } else {
             throw new \InvalidArgumentException();
         }
@@ -983,7 +987,7 @@ class MongoCollection
     private function checkKeys(array $array)
     {
         foreach ($array as $key => $value) {
-            if (empty($key) && $key !== 0) {
+            if (empty($key) && $key !== 0 && $key !== '0') {
                 throw new \MongoException('zero-length keys are not allowed, did you use $ with double quotes?');
             }
 
@@ -999,12 +1003,12 @@ class MongoCollection
      */
     private function ensureDocumentHasMongoId(&$document)
     {
-        if (is_array($document)) {
+        if (is_array($document) || $document instanceof ArrayObject) {
             if (! isset($document['_id'])) {
                 $document['_id'] = new \MongoId();
             }
 
-            $this->checkKeys($document);
+            $this->checkKeys((array) $document);
 
             return $document['_id'];
         } elseif (is_object($document)) {
@@ -1034,6 +1038,22 @@ class MongoCollection
         } elseif (strpos($name, chr(0)) !== false) {
             throw new Exception('Collection name cannot contain null bytes');
         }
+    }
+
+
+    /**
+     * @param array $keys Field or fields to use as index.
+     * @return string
+     */
+    private function generateIndexName($keys)
+    {
+        $name = '';
+
+        foreach ($keys as $field => $type) {
+            $name .= ($name !== '' ? '_' : '') . $field . '_' . $type;
+        }
+
+        return $name;
     }
 
     /**
