@@ -365,7 +365,7 @@ class MongoClient
      */
     private function extractUrlOptions($server)
     {
-        $queryOptions = parse_url($server, PHP_URL_QUERY);
+		$queryOptions = explode('&', parse_url($server, PHP_URL_QUERY) . '');
         if (!$queryOptions) {
             return [];
         }
