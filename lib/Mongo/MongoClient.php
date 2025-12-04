@@ -370,7 +370,7 @@ class MongoClient
             return [];
         }
 
-        $queryOptions = explode('&', $queryOptions);
+        $queryOptions = explode('&', $queryOptions . '');
 
         $options = [];
         foreach ($queryOptions as $option) {
